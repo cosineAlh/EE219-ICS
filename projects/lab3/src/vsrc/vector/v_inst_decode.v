@@ -47,6 +47,14 @@ wire [`REG_BUS]  imm_ext ;
 
 wire inst_vle32_v ;
 // hint: too add other instructions
+wire inst_vadd_vi ;
+wire inst_vmul_vi ;
+wire inst_vadd_vx ;
+wire inst_vmul_vx ;
+wire inst_vadd_vv ;
+wire inst_vmul_vv ;
+wire inst_vle32_v ;
+wire inst_vse32_v ;
 
 // ====================================================
 // Parse
@@ -61,8 +69,16 @@ assign opcode       = inst_i[  6 :  0 ] ;
 
 assign imm_ext      = { {(32-5){imm[4]}}, imm };
 
-assign inst_vle32_v =  ( opcode == `OPCODE_VL  )    & ( funct3 == `WIDTH_VLE32) & ( funct6 == `FUNCT6_VLE32 ) ;
+assign inst_vle32_v =  ( opcode == `OPCODE_VL   )    & ( funct3 == `WIDTH_VLE32 ) & ( funct6 == `FUNCT6_VLE32 ) ;
 // hint: too add other instructions
+assign inst_vmul_vx =  ( opcode == `OPCODE_OPIVX)    & ( funct3 == `FUNCT3_OPIVX) & ( funct6 == `FUNCT6_VMUL  ) ;
+assign inst_vadd_vx =  ( opcode == `OPCODE_OPIVX)    & ( funct3 == `FUNCT3_OPIVX) & ( funct6 == `FUNCT6_VADD  ) ;
+assign inst_vmul_vi =  ( opcode == `OPCODE_OPIVI)    & ( funct3 == `FUNCT3_OPIVI) & ( funct6 == `FUNCT6_VMUL  ) ;
+assign inst_vadd_vi =  ( opcode == `OPCODE_OPIVI)    & ( funct3 == `FUNCT3_OPIVI) & ( funct6 == `FUNCT6_VADD  ) ;
+assign inst_vmul_vv =  ( opcode == `OPCODE_OPIVV)    & ( funct3 == `FUNCT3_OPIVV) & ( funct6 == `FUNCT6_VMUL  ) ; 
+assign inst_vadd_vv =  ( opcode == `OPCODE_OPIVV)    & ( funct3 == `FUNCT3_OPIVV) & ( funct6 == `FUNCT6_VADD  ) ;
+assign inst_vse32_v =  ( opcode == `OPCODE_VS)       & ( funct3 == `FUNCT3_VSE32) & ( funct6 == `FUNCT6_VSE32 ) ;
+
 
 // ====================================================
 // Decode
@@ -71,31 +87,50 @@ assign inst_vle32_v =  ( opcode == `OPCODE_VL  )    & ( funct3 == `WIDTH_VLE32) 
 // hint: no need to add new assign code.
 
 // Control ALU Operation
-assign alu_opcode_o     =   `VALU_OP_NOP     ;
+assign alu_opcode_o     =   ( rst == 1'b1   )                                 ?   `VALU_OP_NOP     :
+                            ( inst_vmul_vx || inst_vmul_vi || inst_vmul_vv)   ?   `VALU_OP_MUL     :
+                            ( inst_vadd_vx || inst_vadd_vi || inst_vadd_vv)   ?   `VALU_OP_ADD     :
+                                                                                  `VALU_OP_NOP     ;
 
 // Control the register visiting
-assign rs1_r_ena_o      =   ( rst == 1'b1 )     ?   1'b0    :
-                            ( inst_vle32_v)     ?   1'b1    :   1'b0    ;
-assign rs1_r_addr_o     =   ( rst == 1'b1 )     ?   0       :
-                            ( inst_vle32_v )    ?   rs1     :   0       ;
-assign vs1_r_ena_o      =   1'b0    ;
-assign vs1_r_addr_o     =   0       ;
-assign vs2_r_ena_o      =   1'b0    ;
-assign vs2_r_addr_o     =   0       ;
+assign rs1_r_ena_o =    ( rst == 1'b1 )     ?   1'b0    :
+                        ( inst_vadd_vx || inst_vmul_vx || inst_vle32_v || inst_vse32_v )     ?   1'b1    :   1'b0    ;
+assign rs1_r_addr_o=    ( rst == 1'b1 )     ?   0       :
+                        (inst_vadd_vx || inst_vmul_vx ||  inst_vle32_v || inst_vse32_v )     ?   rs1     :   0       ;
+assign vs1_r_ena_o =    ( rst == 1'b1 )                             ?   1'b0    :
+                        ( inst_vadd_vx || inst_vmul_vx || inst_vadd_vv || inst_vmul_vv || inst_vadd_vi || inst_vmul_vi )            
+                                                                    ?   1'b1    :
+                                                                        1'b0    ;
+assign vs1_r_addr_o=    ( vs1_r_ena_o ) ?   rs1 : 0 ;
+assign vs2_r_ena_o =    ( rst == 1'b1 )                             ?   1'b0    :
+                        ( inst_vadd_vx || inst_vmul_vx || inst_vadd_vv || inst_vmul_vv || inst_vadd_vi || inst_vmul_vi || inst_vse32_v )                             
+                                                                    ?   1'b1    :
+                                                                        1'b0    ;
+assign vs2_r_addr_o =   ( rst == 1'b1 )                             ?   0       :
+                        ( inst_vadd_vx || inst_vmul_vx || inst_vadd_vv || inst_vmul_vv || inst_vadd_vi || inst_vmul_vi )                             
+                                                                    ?   rs2     :
+                        ( inst_vse32_v )                            ?   vd      :
+                                                                        0       ;
 
 // Control ALU operands
-assign operand_vs1_o    =   0 ;
-assign operand_vs2_o    =   0 ;
+assign operand_vs1_o =  ( rst == 1'b1  )                 ?                      0 : 
+                        ( inst_vadd_vx || inst_vmul_vx ) ? {(`VLMAX){rs1_data_i}} :
+                        ( inst_vadd_vv || inst_vmul_vv ) ?             vs1_data_i :
+                        ( inst_vadd_vi || inst_vmul_vi ) ?    {(`VLMAX){imm_ext}} :
+                                                                                0 ;
+assign operand_vs2_o =  ( rst == 1'b1  )                 ?                      0 : 
+                        ( inst_vadd_vx || inst_vmul_vx || inst_vadd_vv || inst_vmul_vv || inst_vadd_vi || inst_vmul_vi ) ? vs2_data_i :
+                                                                                0 ;
 
 // Control Memory Access 
-assign vmem_r_ena_o     = ( inst_vle32_v )  ? 1'b1         : 0 ;
-assign vmem_r_addr_o    = ( inst_vle32_v )  ? rs1_data_i   : 0 ;
-assign vmem_w_ena_o     =   0 ;
-assign vmem_w_addr_o    =   0 ;
-assign vmem_w_data_o    =   0 ;
+assign vmem_r_ena_o     = inst_vle32_v ? 1'b1 : 0 ;
+assign vmem_r_addr_o    = rs1_data_i ;
+assign vmem_w_ena_o     = inst_vse32_v ? 1'b1 : 0 ;
+assign vmem_w_addr_o    = rs1_data_i ;
+assign vmem_w_data_o    = vs2_data_i ;
 
 // Control Write-Back
-assign vwb_ena_o        = ( inst_vle32_v ) ;
+assign vwb_ena_o        = ( inst_vle32_v || inst_vadd_vx || inst_vmul_vx || inst_vadd_vv || inst_vmul_vv || inst_vadd_vi || inst_vmul_vi ) ;
 assign vwb_sel_o        = ( inst_vle32_v )  ?   1'b1   :   1'b0 ;
 assign vwb_addr_o       = ( vwb_ena_o )     ?   vd      :   0 ;
 

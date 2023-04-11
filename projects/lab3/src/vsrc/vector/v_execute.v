@@ -19,7 +19,13 @@ for(i=0; i < `VLMAX; i=i+1)begin
             case( alu_opcode_i ) 
                 `VALU_OP_NOP: begin 
                     vexe_result_o = 0 ;
-                end 
+                end
+                `VALU_OP_ADD: begin
+                    vexe_result_o [32*i-1:32*(i-1)] = operand_vs1_i [32*i-1:32*(i-1)] + operand_vs2_i [32*i-1:32*(i-1)] ;
+                end
+                `VALU_OP_MUL: begin
+                    vexe_result_o [32*i-1:32*(i-1)] = operand_vs1_i [32*i-1:32*(i-1)] * operand_vs2_i [32*i-1:32*(i-1)] ;
+                end
                 default: begin
                     vexe_result_o = 0 ;
                 end

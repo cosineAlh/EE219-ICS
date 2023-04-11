@@ -28,8 +28,15 @@ always @(*) begin
         alu_result = 0 ;
     end else begin
         case ( alu_opcode_i )
-            `ALU_OP_ADD:    alu_result = ( operand_rs1_i + operand_rs2_i   ) ;
+            `ALU_OP_ADD:    alu_result = ( operand_rs1_i + operand_rs2_i ) ;
             // hint: add more operations
+            `ALU_OP_AND:    alu_result = ( operand_rs1_i & operand_rs2_i ) ;
+            `ALU_OP_SLL:    alu_result = ( operand_rs1_i << operand_rs2_i) ;
+            `ALU_OP_BLT:    alu_result = ( operand_rs1_i < operand_rs2_i ) ? ( current_pc_i + branch_offset_i ) : ( current_pc_i + 4) ;
+            `ALU_OP_JAL:    alu_result = ( current_pc_i + jump_offset_i  ) ;
+            `ALU_OP_MUL:    alu_result = ( operand_rs1_i * operand_rs2_i ) ;
+            `ALU_OP_SLTI:   alu_result = ( operand_rs1_i < operand_rs2_i ) ? 1 : 0 ;
+            `ALU_OP_LUI:    alu_result = ( operand_rs2_i )                 ;
             `ALU_OP_NOP:    alu_result = 0 ;
             default:        alu_result = 0 ;
         endcase
@@ -40,7 +47,7 @@ end
 assign exe_result_o     =   ( jump_en_i )       ?   ( current_pc_i+4 ) : ( alu_result ) ;
 
 // Control Branching
-assign transfer_en_o    =   1'b0 ;
-assign transfer_pc_o    =   `PC_START ;
+assign transfer_en_o    =   ( jump_en_i || branch_en_i ) ;
+assign transfer_pc_o    =   ( transfer_en_o ) ? alu_result : `PC_START ;
 
 endmodule

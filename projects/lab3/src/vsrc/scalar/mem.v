@@ -24,13 +24,13 @@ module mem (
 assign ram_r_ena_o = mem_r_ena_i ;
 assign ram_r_addr_o = mem_r_addr_i ;
 // hint: modify the below line
-assign mem_r_data_o = 0 ;
+assign mem_r_data_o = ram_r_data_i ;
 
 assign ram_w_ena_o = mem_w_ena_i ;
 assign ram_w_addr_o = mem_w_addr_i ;
 // hint: modify the below line
-assign ram_w_data_o = 0 ;
-assign ram_w_mask_o = 0 ;
+assign ram_w_data_o = mem_w_data_i ;
+assign ram_w_mask_o = 32'hffff_ffff;
 
 endmodule
 
