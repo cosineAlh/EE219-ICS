@@ -1,0 +1,2 @@
+sudo docker start 706a9054c435
+sudo docker stop 706a9054c435
